@@ -1,0 +1,6 @@
+parameters:
+    level: 5
+    paths:
+        - src
+    ignoreErrors:
+        - '#Function resource_path not found.#'

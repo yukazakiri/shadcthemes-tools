@@ -1,0 +1,49 @@
+{
+  "name": "yukazakiri/shadcthemes-tools",
+  "description": "Theme management Artisan commands for tweakcn themes.",
+  "type": "library",
+  "license": "MIT",
+  "version": "0.1.0",
+  "require": {
+    "php": "^8.4",
+    "ext-mbstring": "*",
+    "illuminate/console": "^12.0",
+    "illuminate/http": "^12.0",
+    "illuminate/support": "^12.0"
+  },
+  "autoload": {
+    "psr-4": {
+      "Dccp\\ThemeTools\\": "src/"
+    }
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "Tests\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "vendor/bin/pest",
+    "lint": "vendor/bin/pint",
+    "refactor": "vendor/bin/rector process",
+    "analyse": "vendor/bin/phpstan analyse"
+  },
+  "extra": {
+    "laravel": {
+      "providers": [
+        "Dccp\\ThemeTools\\ThemeToolsServiceProvider"
+      ]
+    }
+  },
+  "minimum-stability": "stable",
+  "require-dev": {
+    "pestphp/pest": "*",
+    "laravel/pint": "*",
+    "phpstan/phpstan": "*",
+    "rector/rector": "*"
+  },
+  "config": {
+    "allow-plugins": {
+      "pestphp/pest-plugin": true
+    }
+  }
+}
