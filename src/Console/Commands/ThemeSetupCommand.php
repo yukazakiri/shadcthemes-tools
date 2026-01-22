@@ -61,7 +61,7 @@ final class ThemeSetupCommand extends Command
 
         $stack = $stackChoice === 'Inertia React' ? 'react' : 'vue';
 
-        $this->info("Setting up stand-alone theme configuration for {$stackChoice}...");
+        $this->info(sprintf('Setting up stand-alone theme configuration for %s...', $stackChoice));
 
         $stubFiles = [
             'resources/js/conf/themes.ts' => resource_path('js/conf/themes.ts'),

@@ -71,7 +71,7 @@ final class RemoveThemeCommand extends Command
             return self::SUCCESS;
         }
 
-        $this->info('Removing theme: ' . $themeId);
+        $this->info('Removing theme: '.$themeId);
 
         $this->removeCssFile($themeId);
         $this->removeAppCssImport($themeId);
@@ -150,9 +150,9 @@ final class RemoveThemeCommand extends Command
 
         if (File::exists($cssFile)) {
             File::delete($cssFile);
-            $this->info('Removed CSS file: ' . $cssFile);
+            $this->info('Removed CSS file: '.$cssFile);
         } else {
-            $this->line('CSS file not found: ' . $cssFile);
+            $this->line('CSS file not found: '.$cssFile);
         }
     }
 
