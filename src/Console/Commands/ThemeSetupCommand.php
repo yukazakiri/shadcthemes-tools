@@ -196,6 +196,15 @@ final class ThemeSetupCommand extends Command
         $content = File::get($appCssPath);
         $originalContent = $content;
 
+        // Fix sidebar color mapping if it points to sidebar-background
+        if (Str::contains($content, '--color-sidebar: var(--sidebar-background);')) {
+            $content = str_replace(
+                '--color-sidebar: var(--sidebar-background);',
+                '--color-sidebar: var(--sidebar);',
+                $content
+            );
+        }
+
         // Ensure @theme mappings
         if (! Str::contains($content, '--shadow-2xs: var(--shadow-2xs);')) {
             $mappings = <<<'CSS'
