@@ -223,7 +223,7 @@ final class ThemeSetupCommand extends Command
     --font-mono: var(--font-mono);
     --font-serif: var(--font-serif);
 CSS;
-            if (preg_match('/@theme\s*\{.*?\}/s', $content, $matches)) {
+            if (preg_match('/@theme(\s+inline)?\s*\{.*?\}/s', $content, $matches)) {
                 $themeBlock = $matches[0];
                 $lastBracePos = strrpos($themeBlock, '}');
                 if ($lastBracePos !== false) {
