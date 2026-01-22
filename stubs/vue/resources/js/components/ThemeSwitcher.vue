@@ -56,22 +56,30 @@ const { colorTheme, updateColorTheme } = useColorTheme();
           {{ theme.description }}
         </p>
 
-        <div class="mt-auto flex gap-1.5 pt-2">
-          <div
-            class="h-4 w-4 rounded-full border border-border"
-            :style="{ background: theme.colors.primary }"
-            title="Primary"
-          />
-          <div
-            class="h-4 w-4 rounded-full border border-border"
-            :style="{ background: theme.colors.secondary }"
-            title="Secondary"
-          />
-          <div
-            class="h-4 w-4 rounded-full border border-border"
-            :style="{ background: theme.colors.accent }"
-            title="Accent"
-          />
+        <div class="mt-auto flex items-center justify-between gap-2 pt-2">
+          <div class="flex gap-1.5">
+            <div
+              class="h-4 w-4 rounded-full border border-border"
+              :style="{ background: theme.colors.primary }"
+              title="Primary"
+            />
+            <div
+              class="h-4 w-4 rounded-full border border-border"
+              :style="{ background: theme.colors.secondary }"
+              title="Secondary"
+            />
+            <div
+              class="h-4 w-4 rounded-full border border-border"
+              :style="{ background: theme.colors.accent }"
+              title="Accent"
+            />
+          </div>
+          <span
+            class="text-xs text-muted-foreground truncate"
+            :style="{ fontFamily: theme.font }"
+          >
+            {{ theme.font }}
+          </span>
         </div>
       </div>
     </button>

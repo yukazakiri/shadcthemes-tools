@@ -205,6 +205,22 @@ final class ThemeSetupCommand extends Command
             );
         }
 
+        // Remove the problematic @layer utilities block that overrides fonts
+        $content = preg_replace(
+            '/@layer\s+utilities\s*\{\s*body,\s*html\s*\{[^}]*--font-sans:[^}]*\}\s*\}/s',
+            '',
+            $content
+        );
+
+        // Ensure body applies font-sans class
+        if (Str::contains($content, '@apply bg-background text-foreground;') && ! Str::contains($content, 'font-sans')) {
+            $content = str_replace(
+                '@apply bg-background text-foreground;',
+                '@apply bg-background text-foreground font-sans;',
+                $content
+            );
+        }
+
         // Ensure @theme mappings
         if (! Str::contains($content, '--shadow-2xs: var(--shadow-2xs);')) {
             $mappings = <<<'CSS'

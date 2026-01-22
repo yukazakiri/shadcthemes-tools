@@ -60,22 +60,30 @@ export default function ThemeSwitcher() {
                 {theme.description}
               </p>
 
-              <div className="mt-auto flex gap-1.5 pt-2">
-                <div
-                  className="h-4 w-4 rounded-full border border-border"
-                  style={{ background: theme.colors.primary }}
-                  title="Primary"
-                />
-                <div
-                  className="h-4 w-4 rounded-full border border-border"
-                  style={{ background: theme.colors.secondary }}
-                  title="Secondary"
-                />
-                <div
-                  className="h-4 w-4 rounded-full border border-border"
-                  style={{ background: theme.colors.accent }}
-                  title="Accent"
-                />
+              <div className="mt-auto flex items-center justify-between gap-2 pt-2">
+                <div className="flex gap-1.5">
+                  <div
+                    className="h-4 w-4 rounded-full border border-border"
+                    style={{ background: theme.colors.primary }}
+                    title="Primary"
+                  />
+                  <div
+                    className="h-4 w-4 rounded-full border border-border"
+                    style={{ background: theme.colors.secondary }}
+                    title="Secondary"
+                  />
+                  <div
+                    className="h-4 w-4 rounded-full border border-border"
+                    style={{ background: theme.colors.accent }}
+                    title="Accent"
+                  />
+                </div>
+                <span
+                  className="text-xs text-muted-foreground truncate"
+                  style={{ fontFamily: theme.font }}
+                >
+                  {theme.font}
+                </span>
               </div>
             </div>
           </button>
