@@ -9,66 +9,89 @@ use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\spin;
+use function Laravel\Prompts\text;
+use function Laravel\Prompts\warning;
 
 final class AddThemeCommand extends Command
 {
-    protected $signature = 'theme:add {url : The URL of the shadcn theme JSON}';
+    protected $signature = 'theme:add {url? : The URL of the shadcn theme JSON}';
 
     protected $description = 'Download and install a shadcn theme from a JSON definition';
 
     public function handle(): ?int
     {
-        $url = (string) $this->argument('url');
+        $url = $this->argument('url');
+
+        // If no URL provided, ask for it interactively
+        if (! $url) {
+            $url = text(
+                label: 'Enter the shadcn theme JSON URL',
+                placeholder: 'https://ui.shadcn.com/themes/default.json',
+                hint: 'You can find themes at ui.shadcn.com/themes or other shadcn registries'
+            );
+
+            if (blank($url)) {
+                error('A URL is required to add a theme.');
+
+                return 1;
+            }
+        }
 
         if (! filter_var($url, FILTER_VALIDATE_URL)) {
-            $this->error('Invalid URL provided.');
+            error('Invalid URL provided.');
 
             return 1;
         }
 
-        $this->info(sprintf('Fetching theme from %s...', $url));
+        /** @var array<string, mixed>|null $data */
+        $data = spin(
+            message: 'Fetching theme from '.$url,
+            callback: function () use ($url) {
+                try {
+                    $response = Http::timeout(30)->get($url);
 
-        try {
-            $response = Http::timeout(30)->get($url);
+                    if ($response->failed()) {
+                        return null;
+                    }
 
-            if ($response->failed()) {
-                $this->error('Failed to download theme definition.');
-
-                return 1;
+                    return $response->json();
+                } catch (Exception) {
+                    return null;
+                }
             }
+        );
 
-            $data = $response->json();
-
-            if (! is_array($data) || ! isset($data['cssVars'])) {
-                $this->error('Invalid theme JSON structure.');
-
-                return 1;
-            }
-
-            $themeName = (string) ($data['name'] ?? $this->extractThemeNameFromUrl($url));
-            $themeId = Str::slug($themeName, '-');
-            $displayName = Str::title(str_replace('-', ' ', $themeName));
-
-            $this->info(sprintf('Processing theme: %s (%s)', $displayName, $themeId));
-
-            $fontImports = $this->buildFontImports($data['cssVars']);
-            $cssContent = $this->generateCss($themeId, $data['cssVars']);
-
-            $cssPath = resource_path(sprintf('css/themes/%s.css', $themeId));
-            File::ensureDirectoryExists(dirname($cssPath));
-            File::put($cssPath, $cssContent);
-            $this->info('Created CSS file: '.$cssPath);
-
-            $this->updateAppCss($themeId, $fontImports);
-
-            $this->updateThemesTs($themeId, $displayName, $data['cssVars']);
-
-            $this->info(sprintf("Theme '%s' installed successfully!", $displayName));
-        } catch (Exception $exception) {
-            $this->error('Error: '.$exception->getMessage());
+        if (! is_array($data) || ! isset($data['cssVars'])) {
+            error('Invalid theme JSON structure. The theme must contain cssVars.');
 
             return 1;
         }
+
+        $themeName = (string) ($data['name'] ?? $this->extractThemeNameFromUrl($url));
+        $themeId = Str::slug($themeName, '-');
+        $displayName = Str::title(str_replace('-', ' ', $themeName));
+
+        info(sprintf('Processing theme: %s (%s)', $displayName, $themeId));
+
+        $fontImports = $this->buildFontImports($data['cssVars']);
+        $cssContent = $this->generateCss($themeId, $data['cssVars']);
+
+        $cssPath = resource_path(sprintf('css/themes/%s.css', $themeId));
+        File::ensureDirectoryExists(dirname($cssPath));
+        File::put($cssPath, $cssContent);
+        info('  ✓ Created CSS file: '.$cssPath);
+
+        $this->updateAppCss($themeId, $fontImports);
+
+        $this->updateThemesTs($themeId, $displayName, $data['cssVars']);
+
+        note('');
+        info(sprintf("Theme '%s' installed successfully!", $displayName));
+        note('Run <comment>npm run build</comment> or <comment>npm run dev</comment> to apply the changes.');
 
         return null;
     }
@@ -142,9 +165,9 @@ final class AddThemeCommand extends Command
 
         if ($updated !== $content) {
             File::put($appCssPath, $updated);
-            $this->info('Updated app.css');
+            info('  ✓ Updated app.css');
         } else {
-            $this->warn('app.css already contains the import.');
+            warning('  - app.css already contains the import.');
         }
     }
 
@@ -260,7 +283,7 @@ final class AddThemeCommand extends Command
         $themeConfigPattern = '/id:\s*["\']'.preg_quote($themeId, '/').'["\']/';
 
         if (preg_match($themeConfigPattern, $content)) {
-            $this->warn('themes.ts already contains this theme.');
+            warning('  - themes.ts already contains this theme.');
 
             return;
         }
@@ -270,7 +293,7 @@ final class AddThemeCommand extends Command
 
         if ($contentWithoutEnd === null || $contentWithoutEnd === $content) {
             // Fallback if regex failed to match expected end structure
-            $this->error('Unable to parse themes.ts structure.');
+            error('  ✗ Unable to parse themes.ts structure.');
 
             return;
         }
@@ -278,6 +301,6 @@ final class AddThemeCommand extends Command
         $updatedContent = $contentWithoutEnd.",\n{$newThemeConfig}\n];";
 
         File::put($tsPath, $updatedContent);
-        $this->info('Updated themes.ts');
+        info('  ✓ Updated themes.ts');
     }
 }

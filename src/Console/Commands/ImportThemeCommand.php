@@ -10,11 +10,18 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\spin;
+use function Laravel\Prompts\text;
+use function Laravel\Prompts\warning;
 
 final class ImportThemeCommand extends Command
 {
     protected $signature = 'theme:import
-                            {url : The URL to the theme JSON file (e.g. https://tweakcn.com/r/themes/vintage-paper.json)}
+                            {url? : The URL to the theme JSON file (e.g. https://tweakcn.com/r/themes/vintage-paper.json)}
                             {--name= : Override the theme name}
                             {--description= : Custom description for the theme}';
 
@@ -34,34 +41,48 @@ final class ImportThemeCommand extends Command
 
         $url = $this->argument('url');
 
+        // If no URL provided, ask for it interactively
+        if (! $url) {
+            $url = text(
+                label: 'Enter the theme JSON URL',
+                placeholder: 'https://tweakcn.com/r/themes/vintage-paper.json',
+                hint: 'You can find themes at tweakcn.com or use any shadcn-compatible JSON'
+            );
+
+            if (blank($url)) {
+                error('A URL is required to import a theme.');
+
+                return self::FAILURE;
+            }
+        }
+
         if (! filter_var($url, FILTER_VALIDATE_URL)) {
-            $this->error('Invalid URL provided.');
+            error('Invalid URL provided.');
 
             return self::FAILURE;
         }
 
-        $this->info('Fetching theme from: '.$url);
+        /** @var array<string, mixed>|null $themeData */
+        $themeData = spin(
+            message: 'Fetching theme from: '.$url,
+            callback: function () use ($url) {
+                try {
+                    /** @var Response $response */
+                    $response = Http::timeout(30)->get($url);
 
-        try {
-            /** @var Response $response */
-            $response = Http::timeout(30)->get($url);
+                    if ($response->failed()) {
+                        return null;
+                    }
 
-            if ($response->failed()) {
-                $this->error('Failed to fetch theme: HTTP '.$response->status());
-
-                return self::FAILURE;
+                    return $response->json();
+                } catch (Exception) {
+                    return null;
+                }
             }
+        );
 
-            /** @var array<string, mixed>|null $themeData */
-            $themeData = $response->json();
-
-            if (! $themeData) {
-                $this->error('Failed to parse JSON response.');
-
-                return self::FAILURE;
-            }
-        } catch (Exception $exception) {
-            $this->error('Error fetching theme: '.$exception->getMessage());
+        if (! $themeData) {
+            error('Failed to fetch or parse theme from the provided URL.');
 
             return self::FAILURE;
         }
@@ -70,30 +91,31 @@ final class ImportThemeCommand extends Command
         $themeId = Str::slug($rawThemeName);
         $themeName = Str::title(str_replace(['-', '_'], ' ', $rawThemeName));
 
-        if ($this->themeExists($themeId) && ! $this->confirm(sprintf("Theme '%s' already exists. Overwrite?", $themeId))) {
-            $this->info('Import cancelled.');
+        if ($this->themeExists($themeId)) {
+            if (! confirm(sprintf("Theme '%s' already exists. Overwrite?", $themeId), false)) {
+                info('Import cancelled.');
 
-            return self::SUCCESS;
+                return self::SUCCESS;
+            }
         }
 
-        $this->info(sprintf('Importing theme: %s (id: %s)', $themeName, $themeId));
+        info(sprintf('Importing theme: %s (id: %s)', $themeName, $themeId));
 
         $cssContent = $this->generateCssFromThemeData($themeData, $themeId);
         $cssFilePath = sprintf('%s/%s.css', $this->themesDir, $themeId);
 
         File::ensureDirectoryExists($this->themesDir);
         File::put($cssFilePath, $cssContent);
-        $this->info('Created CSS file: '.$cssFilePath);
+        info('  ✓ Created CSS file: '.$cssFilePath);
 
         $this->updateAppCssImport($themeId);
 
         $description = $this->option('description') ?? 'Imported from tweakcn.';
         $this->updateThemesConfig($themeData, $themeId, $themeName, $description);
 
-        $this->newLine();
-        $this->info('Theme imported successfully!');
-        $this->newLine();
-        $this->line('Run <comment>npm run build</comment> or <comment>npm run dev</comment> to apply the theme.');
+        note('');
+        info('Theme imported successfully!');
+        note('Run <comment>npm run build</comment> or <comment>npm run dev</comment> to apply the theme.');
 
         return self::SUCCESS;
     }
@@ -238,7 +260,7 @@ final class ImportThemeCommand extends Command
         $importStatement = sprintf('@import "./themes/%s.css";', $themeId);
 
         if (str_contains($appCss, $importStatement)) {
-            $this->line('Import already exists in app.css');
+            note('  - Import already exists in app.css');
 
             return;
         }
@@ -257,7 +279,7 @@ final class ImportThemeCommand extends Command
         }
 
         File::put($this->appCssPath, $appCss);
-        $this->info('Updated app.css with theme import');
+        info('  ✓ Updated app.css with theme import');
     }
 
     /**
@@ -293,7 +315,7 @@ final class ImportThemeCommand extends Command
 
         $themeConfigPattern = '/id:\s*["\']'.preg_quote($themeId, '/').'["\']/';
         if (preg_match($themeConfigPattern, (string) $themesConfig)) {
-            $this->info('Theme config already exists, updating...');
+            info('  - Theme config already exists, updating...');
         } else {
             $newThemeConfig = <<<EOT
     {
@@ -327,6 +349,6 @@ EOT;
         }
 
         File::put($this->themesConfigPath, $themesConfig);
-        $this->info('Updated themes.ts configuration');
+        info('  ✓ Updated themes.ts configuration');
     }
 }

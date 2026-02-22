@@ -6,6 +6,12 @@ namespace Dccp\ThemeTools\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\warning;
 
 final class ThemeUpdateCommand extends Command
 {
@@ -15,13 +21,25 @@ final class ThemeUpdateCommand extends Command
 
     public function handle(): int
     {
-        if (! $this->option('force') && ! $this->confirm('This will overwrite your theme personalization components. Do you wish to continue?')) {
-            $this->info('Update cancelled.');
+        $stack = $this->detectStack();
+
+        if ($stack === null) {
+            $stack = select(
+                label: 'Which stack are you using?',
+                options: [
+                    'react' => 'Inertia React',
+                    'vue' => 'Inertia Vue',
+                ],
+                default: 'react',
+                hint: 'We couldn\'t auto-detect your stack'
+            );
+        }
+
+        if (! $this->option('force') && ! confirm('This will overwrite your theme personalization components. Do you wish to continue?', false)) {
+            info('Update cancelled.');
 
             return 0;
         }
-
-        $stack = $this->detectStack();
 
         if ($stack === 'react') {
             $stubPath = __DIR__.'/../../../stubs/react/resources/js/components/theme-switcher.tsx';
@@ -32,19 +50,23 @@ final class ThemeUpdateCommand extends Command
         }
 
         if (! File::exists($stubPath)) {
-            $this->error('Theme stub not found at: '.$stubPath);
+            error('Theme stub not found at: '.$stubPath);
 
             return 1;
         }
 
         File::ensureDirectoryExists(dirname($destPath));
         File::copy($stubPath, $destPath);
-        $this->info('Updated '.basename($destPath));
+        info('  ✓ Updated '.basename($destPath));
+
+        note('');
+        info('Theme components updated successfully!');
+        note('Run <comment>npm run build</comment> or <comment>npm run dev</comment> to apply the changes.');
 
         return 0;
     }
 
-    private function detectStack(): string
+    private function detectStack(): ?string
     {
         if (File::exists(resource_path('js/components/theme-switcher.tsx'))) {
             return 'react';
@@ -58,6 +80,10 @@ final class ThemeUpdateCommand extends Command
             return 'react';
         }
 
-        return 'vue';
+        if (File::exists(resource_path('js/app.ts')) && File::exists(resource_path('js/Pages'))) {
+            return 'vue';
+        }
+
+        return null;
     }
 }
