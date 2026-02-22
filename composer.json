@@ -3,7 +3,7 @@
   "description": "Theme management Artisan commands for tweakcn themes.",
   "type": "library",
   "license": "MIT",
-  "version": "0.1.3",
+  "version": "0.1.4",
   "require": {
     "php": "^8.4",
     "ext-mbstring": "*",
