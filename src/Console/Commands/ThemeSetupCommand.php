@@ -7,6 +7,10 @@ namespace Dccp\ThemeTools\Console\Commands;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use function Laravel\Prompts\info;
+use function Laravel\Prompts\note;
+use function Laravel\Prompts\select;
+use function Laravel\Prompts\warning;
 
 final class ThemeSetupCommand extends Command
 {
@@ -20,32 +24,40 @@ final class ThemeSetupCommand extends Command
 
     public function handle(): int
     {
-        $setupChoice = $this->choice(
-            'How would you like to set up themes?',
-            [self::STARTER_KIT, self::STANDALONE],
-            0,
+        $setupChoice = select(
+            label: 'How would you like to set up themes?',
+            options: [
+                'starter' => 'Starter kit template (includes UI components)',
+                'standalone' => 'Stand-alone configuration (hook/composable only)',
+            ],
+            default: 'starter',
+            hint: 'Starter kit includes pre-built theme switcher components'
         );
 
-        if ($setupChoice === self::STANDALONE) {
+        if ($setupChoice === 'standalone') {
             return $this->installStandalone();
         }
 
-        $stackChoice = $this->choice(
-            'Which starter kit would you like to install?',
-            ['Inertia React', 'Inertia Vue'],
-            0,
+        $stackChoice = select(
+            label: 'Which starter kit would you like to install?',
+            options: [
+                'react' => 'Inertia React',
+                'vue' => 'Inertia Vue',
+            ],
+            default: 'react',
+            hint: 'Choose the stack matching your application'
         );
 
-        $stack = $stackChoice === 'Inertia React' ? 'react' : 'vue';
+        $stack = $stackChoice;
 
-        $this->info(sprintf('Installing the %s starter kit...', $stackChoice));
+        info(sprintf('Installing the %s starter kit...', $stack === 'react' ? 'Inertia React' : 'Inertia Vue'));
 
         $result = $stack === 'react' ? $this->installReactStarterKit() : $this->installVueStarterKit();
 
         if ($result === self::SUCCESS) {
-            $this->newLine();
-            $this->info('Starter kit installed successfully.');
-            $this->line('Run <comment>npm run dev</comment> or <comment>npm run build</comment> to apply the styles.');
+            note('');
+            info('Starter kit installed successfully.');
+            note('Run <comment>npm run dev</comment> or <comment>npm run build</comment> to apply the styles.');
         }
 
         return $result;
@@ -53,15 +65,19 @@ final class ThemeSetupCommand extends Command
 
     private function installStandalone(): int
     {
-        $stackChoice = $this->choice(
-            'Which stack are you using?',
-            ['Inertia React', 'Inertia Vue'],
-            0,
+        $stackChoice = select(
+            label: 'Which stack are you using?',
+            options: [
+                'react' => 'Inertia React',
+                'vue' => 'Inertia Vue',
+            ],
+            default: 'react',
+            hint: 'Choose the stack matching your application'
         );
 
-        $stack = $stackChoice === 'Inertia React' ? 'react' : 'vue';
+        $stack = $stackChoice;
 
-        $this->info(sprintf('Setting up stand-alone theme configuration for %s...', $stackChoice));
+        info(sprintf('Setting up stand-alone theme configuration for %s...', $stack === 'react' ? 'Inertia React' : 'Inertia Vue'));
 
         $stubFiles = [
             'resources/js/conf/themes.ts' => resource_path('js/conf/themes.ts'),
@@ -84,10 +100,10 @@ final class ThemeSetupCommand extends Command
         });
 
         if ($result === self::SUCCESS) {
-            $this->newLine();
-            $this->info('Stand-alone configuration set up successfully.');
-            $this->info('You can now use the `useColorTheme` hook/composable to build your own UI.');
-            $this->line('Run <comment>npm run dev</comment> or <comment>npm run build</comment> to apply the styles.');
+            note('');
+            info('Stand-alone configuration set up successfully.');
+            info('You can now use the `useColorTheme` hook/composable to build your own UI.');
+            note('Run <comment>npm run dev</comment> or <comment>npm run build</comment> to apply the styles.');
         }
 
         return $result;
@@ -152,7 +168,7 @@ final class ThemeSetupCommand extends Command
         File::ensureDirectoryExists(dirname($destination));
         File::put($destination, File::get($stubPath));
 
-        $this->info('Wrote: '.$destination);
+        info('  ✓ Wrote: '.$destination);
 
         return true;
     }
@@ -161,7 +177,7 @@ final class ThemeSetupCommand extends Command
     {
         $appCssPath = resource_path('css/app.css');
         if (! File::exists($appCssPath)) {
-            $this->warn('app.css not found, skipping CSS imports update.');
+            warning('app.css not found, skipping CSS imports update.');
 
             return;
         }
@@ -185,7 +201,7 @@ final class ThemeSetupCommand extends Command
 
         if ($updated !== $content) {
             File::put($appCssPath, $updated);
-            $this->info('Updated app.css with theme imports.');
+            info('  ✓ Updated app.css with theme imports.');
         }
 
         $this->ensureAppCssMappings($appCssPath);
@@ -279,7 +295,7 @@ CSS;
 
         if ($content !== $originalContent) {
             File::put($appCssPath, $content);
-            $this->info('Updated app.css with shadow and font mappings.');
+            info('  ✓ Updated app.css with shadow and font mappings.');
         }
     }
 
@@ -332,7 +348,7 @@ CSS;
 
         if ($updated !== $content) {
             File::put($appPath, $updated);
-            $this->info('Updated app.tsx to initialize theme colors.');
+            info('  ✓ Updated app.tsx to initialize theme colors.');
         }
     }
 
@@ -382,7 +398,7 @@ CSS;
 
         if ($updated !== $content) {
             File::put($appPath, $updated);
-            $this->info('Updated app.ts/js to initialize theme colors.');
+            info('  ✓ Updated app.ts/js to initialize theme colors.');
         }
     }
 
