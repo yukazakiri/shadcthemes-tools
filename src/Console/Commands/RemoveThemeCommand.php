@@ -2,19 +2,18 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools\Console\Commands;
+namespace Yukzakiri\ThemeTools\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
-use Laravel\Prompts\Prompt;
-use Laravel\Prompts\Themes\Default\Renderer;
+use Yukzakiri\ThemeTools\Support\ThemeConfigFile;
+
 use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\multiselect;
 use function Laravel\Prompts\note;
-use function Laravel\Prompts\select;
 use function Laravel\Prompts\warning;
-use function Laravel\Prompts\error;
 
 final class RemoveThemeCommand extends Command
 {
@@ -80,6 +79,10 @@ final class RemoveThemeCommand extends Command
             return self::SUCCESS;
         }
 
+        if (! $this->hasRequiredThemeFiles()) {
+            return self::FAILURE;
+        }
+
         $this->removeTheme($themeId);
 
         return self::SUCCESS;
@@ -96,7 +99,7 @@ final class RemoveThemeCommand extends Command
         }
 
         // Filter out protected themes for removal options
-        $removableThemes = array_filter($themes, fn ($theme) => ! in_array($theme, $this->protectedThemes));
+        $removableThemes = array_filter($themes, fn ($theme): bool => ! in_array($theme, $this->protectedThemes));
 
         if ($removableThemes === []) {
             warning('All installed themes are protected and cannot be removed.');
@@ -139,10 +142,14 @@ final class RemoveThemeCommand extends Command
 
         // Confirm removal
         $themeList = implode(', ', $selectedThemes);
-        if (! $this->option('force') && ! confirm(sprintf("Are you sure you want to remove the following themes: %s?", $themeList), false)) {
+        if (! $this->option('force') && ! confirm(sprintf('Are you sure you want to remove the following themes: %s?', $themeList), false)) {
             info('Removal cancelled.');
 
             return self::SUCCESS;
+        }
+
+        if (! $this->hasRequiredThemeFiles()) {
+            return self::FAILURE;
         }
 
         // Remove each selected theme
@@ -160,7 +167,7 @@ final class RemoveThemeCommand extends Command
     private function removeAllThemes(): int
     {
         $themes = $this->getAvailableThemes();
-        $removableThemes = array_filter($themes, fn ($theme) => ! in_array($theme, $this->protectedThemes));
+        $removableThemes = array_filter($themes, fn (string $theme): bool => ! in_array($theme, $this->protectedThemes));
 
         if ($removableThemes === []) {
             warning('No removable themes found.');
@@ -175,6 +182,10 @@ final class RemoveThemeCommand extends Command
             info('Removal cancelled.');
 
             return self::SUCCESS;
+        }
+
+        if (! $this->hasRequiredThemeFiles()) {
+            return self::FAILURE;
         }
 
         foreach ($removableThemes as $themeId) {
@@ -256,6 +267,21 @@ final class RemoveThemeCommand extends Command
         return File::exists($cssFile);
     }
 
+    private function hasRequiredThemeFiles(): bool
+    {
+        foreach ([$this->appCssPath, $this->themesConfigPath] as $path) {
+            if (File::exists($path)) {
+                continue;
+            }
+
+            error(sprintf('Missing %s. Run <comment>php artisan theme:setup</comment> before removing themes.', $path));
+
+            return false;
+        }
+
+        return true;
+    }
+
     private function removeCssFile(string $themeId): void
     {
         $cssFile = sprintf('%s/%s.css', $this->themesDir, $themeId);
@@ -296,43 +322,7 @@ final class RemoveThemeCommand extends Command
 
     private function removeThemesConfig(string $themeId): void
     {
-        $themesConfig = File::get($this->themesConfigPath);
-        $modified = false;
-
-        $colorThemePattern = '/export type ColorTheme =\s*\n([\s\S]*?);/';
-        if (preg_match($colorThemePattern, $themesConfig, $matches)) {
-            $typeLines = explode("\n", trim($matches[1]));
-            $filteredLines = [];
-
-            foreach ($typeLines as $line) {
-                if (str_contains($line, sprintf("'%s'", $themeId)) || str_contains($line, sprintf('"%s"', $themeId))) {
-                    $modified = true;
-
-                    continue;
-                }
-
-                $filteredLines[] = $line;
-            }
-
-            if ($modified) {
-                $newTypes = implode("\n", $filteredLines);
-                $themesConfig = preg_replace($colorThemePattern, "export type ColorTheme =\n{$newTypes};", $themesConfig);
-            }
-        }
-
-        $themeObjectPattern = '/\s*,?\n\s*\{[\s\S]*?id:\s*["\']'.preg_quote($themeId, '/').'["\'][\s\S]*?\n\s*\},?/';
-
-        if (preg_match($themeObjectPattern, (string) $themesConfig)) {
-            $themesConfig = preg_replace($themeObjectPattern, '', (string) $themesConfig);
-            $modified = true;
-        }
-
-        $themesConfig = preg_replace('/,\s*,/', ',', (string) $themesConfig);
-        $themesConfig = preg_replace('/,\s*\]/', "\n]", (string) $themesConfig);
-        $themesConfig = preg_replace('/\[\s*,/', '[', (string) $themesConfig);
-
-        if ($modified) {
-            File::put($this->themesConfigPath, $themesConfig);
+        if ((new ThemeConfigFile($this->themesConfigPath))->removeTheme($themeId)) {
             info('  ✓ Removed theme from themes.ts configuration');
         } else {
             note('  - Theme not found in themes.ts configuration');

@@ -2,14 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools;
+namespace Yukzakiri\ThemeTools;
 
-use Dccp\ThemeTools\Console\Commands\AddThemeCommand;
-use Dccp\ThemeTools\Console\Commands\ImportThemeCommand;
-use Dccp\ThemeTools\Console\Commands\RemoveThemeCommand;
-use Dccp\ThemeTools\Console\Commands\ThemeSetupCommand;
-use Dccp\ThemeTools\Console\Commands\ThemeUpdateCommand;
 use Illuminate\Support\ServiceProvider;
+use Yukzakiri\ThemeTools\Console\Commands\AddThemeCommand;
+use Yukzakiri\ThemeTools\Console\Commands\ImportThemeCommand;
+use Yukzakiri\ThemeTools\Console\Commands\RemoveThemeCommand;
+use Yukzakiri\ThemeTools\Console\Commands\ThemeDoctorCommand;
+use Yukzakiri\ThemeTools\Console\Commands\ThemeSetupCommand;
+use Yukzakiri\ThemeTools\Console\Commands\ThemeUpdateCommand;
 
 final class ThemeToolsServiceProvider extends ServiceProvider
 {
@@ -21,6 +22,7 @@ final class ThemeToolsServiceProvider extends ServiceProvider
 
         $this->commands([
             AddThemeCommand::class,
+            ThemeDoctorCommand::class,
             ImportThemeCommand::class,
             RemoveThemeCommand::class,
             ThemeSetupCommand::class,

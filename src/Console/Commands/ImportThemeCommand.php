@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools\Console\Commands;
+namespace Yukzakiri\ThemeTools\Console\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
@@ -10,13 +10,14 @@ use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Yukzakiri\ThemeTools\Support\ThemeConfigFile;
+
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\spin;
 use function Laravel\Prompts\text;
-use function Laravel\Prompts\warning;
 
 final class ImportThemeCommand extends Command
 {
@@ -62,9 +63,12 @@ final class ImportThemeCommand extends Command
             return self::FAILURE;
         }
 
+        if (! $this->hasRequiredThemeFiles()) {
+            return self::FAILURE;
+        }
+
         /** @var array<string, mixed>|null $themeData */
         $themeData = spin(
-            message: 'Fetching theme from: '.$url,
             callback: function () use ($url) {
                 try {
                     /** @var Response $response */
@@ -78,7 +82,8 @@ final class ImportThemeCommand extends Command
                 } catch (Exception) {
                     return null;
                 }
-            }
+            },
+            message: 'Fetching theme from: '.$url
         );
 
         if (! $themeData) {
@@ -91,12 +96,10 @@ final class ImportThemeCommand extends Command
         $themeId = Str::slug($rawThemeName);
         $themeName = Str::title(str_replace(['-', '_'], ' ', $rawThemeName));
 
-        if ($this->themeExists($themeId)) {
-            if (! confirm(sprintf("Theme '%s' already exists. Overwrite?", $themeId), false)) {
-                info('Import cancelled.');
+        if ($this->themeExists($themeId) && ! confirm(sprintf("Theme '%s' already exists. Overwrite?", $themeId), false)) {
+            info('Import cancelled.');
 
-                return self::SUCCESS;
-            }
+            return self::SUCCESS;
         }
 
         info(sprintf('Importing theme: %s (id: %s)', $themeName, $themeId));
@@ -133,6 +136,21 @@ final class ImportThemeCommand extends Command
         $cssFile = sprintf('%s/%s.css', $this->themesDir, $themeId);
 
         return File::exists($cssFile);
+    }
+
+    private function hasRequiredThemeFiles(): bool
+    {
+        foreach ([$this->appCssPath, $this->themesConfigPath] as $path) {
+            if (File::exists($path)) {
+                continue;
+            }
+
+            error(sprintf('Missing %s. Run <comment>php artisan theme:setup</comment> before importing themes.', $path));
+
+            return false;
+        }
+
+        return true;
     }
 
     /**
@@ -187,7 +205,7 @@ final class ImportThemeCommand extends Command
                     $primaryFont = mb_trim(explode(',', $fontValue)[0]);
                     $primaryFont = mb_trim($primaryFont, "\"'");
 
-                    if (in_array(mb_strtolower($primaryFont), ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace'])) {
+                    if (in_array(mb_strtolower($primaryFont), ['serif', 'sans-serif', 'monospace', 'cursive', 'fantasy', 'system-ui', 'ui-sans-serif', 'ui-serif', 'ui-monospace'], true)) {
                         continue;
                     }
 
@@ -217,7 +235,7 @@ final class ImportThemeCommand extends Command
 
         $output = '';
         foreach ($allVars as $key => $value) {
-            if (in_array($key, $skipVars) && isset($themeVars[$key])) {
+            if (in_array($key, $skipVars, true) && isset($themeVars[$key])) {
                 continue;
             }
 
@@ -287,7 +305,6 @@ final class ImportThemeCommand extends Command
      */
     private function updateThemesConfig(array $themeData, string $themeId, string $themeName, string $description): void
     {
-        $themesConfig = File::get($this->themesConfigPath);
         $cssVars = $themeData['cssVars'] ?? [];
 
         $font = 'System Sans';
@@ -304,51 +321,16 @@ final class ImportThemeCommand extends Command
         $secondary = $lightVars['secondary'] ?? 'oklch(0.8 0.05 200)';
         $accent = $lightVars['accent'] ?? 'oklch(0.7 0.1 200)';
 
-        $colorThemePattern = '/export type ColorTheme = ([^\n]+)/';
-        if (preg_match($colorThemePattern, $themesConfig, $matches)) {
-            $existingTypes = $matches[1];
-            if (! str_contains($existingTypes, sprintf('"%s"', $themeId))) {
-                $newTypes = mb_rtrim($existingTypes).sprintf(' | "%s"', $themeId);
-                $themesConfig = preg_replace($colorThemePattern, 'export type ColorTheme = '.$newTypes, $themesConfig);
-            }
-        }
+        $updated = (new ThemeConfigFile($this->themesConfigPath))->addTheme([
+            'id' => $themeId,
+            'name' => $themeName,
+            'description' => $description,
+            'font' => $font,
+            'primary' => (string) $primary,
+            'secondary' => (string) $secondary,
+            'accent' => (string) $accent,
+        ]);
 
-        $themeConfigPattern = '/id:\s*["\']'.preg_quote($themeId, '/').'["\']/';
-        if (preg_match($themeConfigPattern, (string) $themesConfig)) {
-            info('  - Theme config already exists, updating...');
-        } else {
-            $newThemeConfig = <<<EOT
-    {
-        id: "{$themeId}",
-        name: "{$themeName}",
-        description: "{$description}",
-        font: "{$font}",
-        colors: {
-            primary: "{$primary}",
-            secondary: "{$secondary}",
-            accent: "{$accent}",
-        }
-    }
-EOT;
-
-            // Remove the closing bracket and any trailing comma/whitespace before it
-            $contentWithoutEnd = preg_replace('/,?\s*\n\];\s*$/', '', (string) $themesConfig);
-
-            if ($contentWithoutEnd !== null && $contentWithoutEnd !== $themesConfig) {
-                $themesConfig = $contentWithoutEnd.",\n{$newThemeConfig}\n];";
-            } else {
-                // Fallback to simpler append if regex fails
-                $closingBracketPos = mb_strrpos((string) $themesConfig, ']');
-                if ($closingBracketPos !== false) {
-                    $beforeClosing = mb_substr((string) $themesConfig, 0, $closingBracketPos);
-                    $afterClosing = mb_substr((string) $themesConfig, $closingBracketPos);
-                    $beforeClosing = mb_rtrim($beforeClosing, ", \t\n\r\0\x0B"); // Trim comma and whitespace
-                    $themesConfig = $beforeClosing.",\n".$newThemeConfig."\n".$afterClosing;
-                }
-            }
-        }
-
-        File::put($this->themesConfigPath, $themesConfig);
-        info('  ✓ Updated themes.ts configuration');
+        info($updated ? '  ✓ Updated themes.ts configuration' : '  - Theme config already exists.');
     }
 }

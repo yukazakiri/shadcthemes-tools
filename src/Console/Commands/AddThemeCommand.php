@@ -2,13 +2,15 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools\Console\Commands;
+namespace Yukzakiri\ThemeTools\Console\Commands;
 
 use Exception;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Str;
+use Yukzakiri\ThemeTools\Support\ThemeConfigFile;
+
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
@@ -47,9 +49,12 @@ final class AddThemeCommand extends Command
             return 1;
         }
 
+        if (! $this->hasRequiredThemeFiles()) {
+            return 1;
+        }
+
         /** @var array<string, mixed>|null $data */
         $data = spin(
-            message: 'Fetching theme from '.$url,
             callback: function () use ($url) {
                 try {
                     $response = Http::timeout(30)->get($url);
@@ -62,7 +67,8 @@ final class AddThemeCommand extends Command
                 } catch (Exception) {
                     return null;
                 }
-            }
+            },
+            message: 'Fetching theme from '.$url
         );
 
         if (! is_array($data) || ! isset($data['cssVars'])) {
@@ -197,7 +203,7 @@ final class AddThemeCommand extends Command
             $fontFamily = mb_trim($fontFamily, "'\"");
             $ignored = ['ui-sans-serif', 'system-ui', 'sans-serif', 'serif', 'monospace', 'inherit'];
 
-            if (in_array(mb_strtolower($fontFamily), $ignored)) {
+            if (in_array(mb_strtolower($fontFamily), $ignored, true)) {
                 continue;
             }
 
@@ -239,26 +245,27 @@ final class AddThemeCommand extends Command
         return Str::title(str_replace(['-', '_'], ' ', $filename));
     }
 
+    protected function hasRequiredThemeFiles(): bool
+    {
+        foreach (['css/app.css', 'js/conf/themes.ts'] as $path) {
+            if (File::exists(resource_path($path))) {
+                continue;
+            }
+
+            error(sprintf('Missing resources/%s. Run <comment>php artisan theme:setup</comment> before adding themes.', $path));
+
+            return false;
+        }
+
+        return true;
+    }
+
     /**
      * @param  array<string, mixed>  $vars
      */
     protected function updateThemesTs(string $themeId, string $displayName, array $vars): void
     {
         $tsPath = resource_path('js/conf/themes.ts');
-        $content = File::get($tsPath);
-
-        $colorThemePattern = '/export type ColorTheme =\s*\n([\s\S]*?);/';
-        if (preg_match($colorThemePattern, $content, $matches)) {
-            $existingTypes = trim($matches[1]);
-            $hasType = Str::contains($existingTypes, sprintf("'%s'", $themeId))
-                || Str::contains($existingTypes, sprintf('"%s"', $themeId));
-
-            if (! $hasType) {
-                $newTypes = "{$existingTypes}\n    | '{$themeId}'";
-                $content = preg_replace($colorThemePattern, "export type ColorTheme =\n{$newTypes};", $content);
-            }
-        }
-
         $light = $vars['light'] ?? [];
         $primary = $light['primary'] ?? 'oklch(0.5 0.2 250)';
         $secondary = $light['secondary'] ?? 'oklch(0.9 0.05 250)';
@@ -268,39 +275,22 @@ final class AddThemeCommand extends Command
         $fontName = mb_trim(explode(',', $fontValue)[0]);
         $fontName = mb_trim($fontName, "'\"");
 
-        $newThemeConfig = "    {\n";
-        $newThemeConfig .= "        id: '{$themeId}',\n";
-        $newThemeConfig .= "        name: '{$displayName}',\n";
-        $newThemeConfig .= "        description: 'Imported from a shadcn theme registry.',\n";
-        $newThemeConfig .= "        font: '{$fontName}',\n";
-        $newThemeConfig .= "        colors: {\n";
-        $newThemeConfig .= "            primary: '{$primary}',\n";
-        $newThemeConfig .= "            secondary: '{$secondary}',\n";
-        $newThemeConfig .= "            accent: '{$accent}',\n";
-        $newThemeConfig .= "        },\n";
-        $newThemeConfig .= '    }';
+        $updated = (new ThemeConfigFile($tsPath))->addTheme([
+            'id' => $themeId,
+            'name' => $displayName,
+            'description' => 'Imported from a shadcn theme registry.',
+            'font' => $fontName,
+            'primary' => (string) $primary,
+            'secondary' => (string) $secondary,
+            'accent' => (string) $accent,
+        ]);
 
-        $themeConfigPattern = '/id:\s*["\']'.preg_quote($themeId, '/').'["\']/';
-
-        if (preg_match($themeConfigPattern, $content)) {
+        if (! $updated) {
             warning('  - themes.ts already contains this theme.');
 
             return;
         }
 
-        // Remove the closing bracket and any trailing comma/whitespace before it
-        $contentWithoutEnd = preg_replace('/,?\s*\n\];\s*$/', '', $content);
-
-        if ($contentWithoutEnd === null || $contentWithoutEnd === $content) {
-            // Fallback if regex failed to match expected end structure
-            error('  ✗ Unable to parse themes.ts structure.');
-
-            return;
-        }
-
-        $updatedContent = $contentWithoutEnd.",\n{$newThemeConfig}\n];";
-
-        File::put($tsPath, $updatedContent);
         info('  ✓ Updated themes.ts');
     }
 }

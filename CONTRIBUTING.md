@@ -8,7 +8,7 @@ To develop this package locally, you typically link it to a Laravel application 
 
 ### Prerequisites
 
-- PHP 8.4+
+- PHP 8.2+ for Laravel 12 testing, PHP 8.4+ for Laravel 13 testing
 - Composer
 - Laravel 12+ (for testing the integration)
 
@@ -29,7 +29,7 @@ To develop this package locally, you typically link it to a Laravel application 
         }
     ],
     "require": {
-        "yukazakiri/shadcthemes-tools": "@dev"
+        "yukzakiri/shadcthemes-tools": "@dev"
     }
     ```
 
@@ -38,7 +38,7 @@ To develop this package locally, you typically link it to a Laravel application 
 2.  **Install the package:**
 
     ```bash
-    composer update yukazakiri/shadcthemes-tools
+    composer update yukzakiri/shadcthemes-tools
     ```
 
 ### Developing with Laravel Sail
@@ -74,7 +74,7 @@ vendor/bin/pest
 ```bash
 composer analyse
 # or
-vendor/bin/phpstan analyse
+php -d memory_limit=512M vendor/bin/phpstan analyse
 ```
 
 **Run Code Linting (Pint):**

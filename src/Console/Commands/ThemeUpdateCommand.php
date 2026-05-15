@@ -2,26 +2,40 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools\Console\Commands;
+namespace Yukzakiri\ThemeTools\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
+
 use function Laravel\Prompts\confirm;
 use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\select;
-use function Laravel\Prompts\warning;
 
 final class ThemeUpdateCommand extends Command
 {
-    protected $signature = 'theme:update {--force : Force update without confirmation}';
+    protected $signature = 'theme:update
+                            {--stack= : Frontend stack: react or vue}
+                            {--force : Force update without confirmation}';
 
     protected $description = 'Update the theme personalization components';
 
     public function handle(): int
     {
-        $stack = $this->detectStack();
+        $stack = $this->option('stack');
+
+        if ($stack !== null) {
+            $stack = (string) $stack;
+
+            if (! in_array($stack, ['react', 'vue'], true)) {
+                error(sprintf('Invalid --stack value "%s". Expected react or vue.', $stack));
+
+                return self::FAILURE;
+            }
+        }
+
+        $stack ??= $this->detectStack();
 
         if ($stack === null) {
             $stack = select(
@@ -31,14 +45,14 @@ final class ThemeUpdateCommand extends Command
                     'vue' => 'Inertia Vue',
                 ],
                 default: 'react',
-                hint: 'We couldn\'t auto-detect your stack'
+                hint: "We couldn't auto-detect your stack"
             );
         }
 
         if (! $this->option('force') && ! confirm('This will overwrite your theme personalization components. Do you wish to continue?', false)) {
             info('Update cancelled.');
 
-            return 0;
+            return self::SUCCESS;
         }
 
         if ($stack === 'react') {
@@ -52,7 +66,7 @@ final class ThemeUpdateCommand extends Command
         if (! File::exists($stubPath)) {
             error('Theme stub not found at: '.$stubPath);
 
-            return 1;
+            return self::FAILURE;
         }
 
         File::ensureDirectoryExists(dirname($destPath));
@@ -63,7 +77,7 @@ final class ThemeUpdateCommand extends Command
         info('Theme components updated successfully!');
         note('Run <comment>npm run build</comment> or <comment>npm run dev</comment> to apply the changes.');
 
-        return 0;
+        return self::SUCCESS;
     }
 
     private function detectStack(): ?string
@@ -80,7 +94,31 @@ final class ThemeUpdateCommand extends Command
             return 'react';
         }
 
-        if (File::exists(resource_path('js/app.ts')) && File::exists(resource_path('js/Pages'))) {
+        if (File::exists(resource_path('js/app.ts')) && (File::exists(resource_path('js/Pages')) || File::exists(resource_path('js/pages')))) {
+            return 'vue';
+        }
+
+        $packageJson = base_path('package.json');
+        if (! File::exists($packageJson)) {
+            return null;
+        }
+
+        $contents = json_decode(File::get($packageJson), true);
+
+        if (! is_array($contents)) {
+            return null;
+        }
+
+        $dependencies = array_merge(
+            is_array($contents['dependencies'] ?? null) ? $contents['dependencies'] : [],
+            is_array($contents['devDependencies'] ?? null) ? $contents['devDependencies'] : [],
+        );
+
+        if (array_key_exists('@inertiajs/react', $dependencies)) {
+            return 'react';
+        }
+
+        if (array_key_exists('@inertiajs/vue3', $dependencies)) {
             return 'vue';
         }
 

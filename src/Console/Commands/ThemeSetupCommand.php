@@ -2,11 +2,14 @@
 
 declare(strict_types=1);
 
-namespace Dccp\ThemeTools\Console\Commands;
+namespace Yukzakiri\ThemeTools\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+
+use function Laravel\Prompts\confirm;
+use function Laravel\Prompts\error;
 use function Laravel\Prompts\info;
 use function Laravel\Prompts\note;
 use function Laravel\Prompts\select;
@@ -14,41 +17,44 @@ use function Laravel\Prompts\warning;
 
 final class ThemeSetupCommand extends Command
 {
-    protected $signature = 'theme:setup';
+    protected $signature = 'theme:setup
+                            {--mode= : Setup mode: starter or standalone}
+                            {--stack= : Frontend stack: react or vue}
+                            {--force : Overwrite existing files without prompting}
+                            {--skip-existing : Keep existing files instead of overwriting them}
+                            {--dry-run : Show files that would be written without changing them}';
 
     protected $description = 'Set up theme tooling and starter kits';
 
-    private const STARTER_KIT = 'Starter kit template';
-
-    private const STANDALONE = 'Stand-alone configuration';
+    protected $aliases = ['theme:install'];
 
     public function handle(): int
     {
-        $setupChoice = select(
+        $setupChoice = $this->resolveChoice(
+            option: 'mode',
+            allowed: ['starter', 'standalone'],
             label: 'How would you like to set up themes?',
             options: [
                 'starter' => 'Starter kit template (includes UI components)',
                 'standalone' => 'Stand-alone configuration (hook/composable only)',
             ],
             default: 'starter',
-            hint: 'Starter kit includes pre-built theme switcher components'
+            hint: 'Starter kit includes pre-built theme switcher components',
         );
+
+        if ($setupChoice === null) {
+            return self::FAILURE;
+        }
 
         if ($setupChoice === 'standalone') {
             return $this->installStandalone();
         }
 
-        $stackChoice = select(
-            label: 'Which starter kit would you like to install?',
-            options: [
-                'react' => 'Inertia React',
-                'vue' => 'Inertia Vue',
-            ],
-            default: 'react',
-            hint: 'Choose the stack matching your application'
-        );
+        $stack = $this->resolveStackChoice('Which starter kit would you like to install?');
 
-        $stack = $stackChoice;
+        if ($stack === null) {
+            return self::FAILURE;
+        }
 
         info(sprintf('Installing the %s starter kit...', $stack === 'react' ? 'Inertia React' : 'Inertia Vue'));
 
@@ -65,17 +71,11 @@ final class ThemeSetupCommand extends Command
 
     private function installStandalone(): int
     {
-        $stackChoice = select(
-            label: 'Which stack are you using?',
-            options: [
-                'react' => 'Inertia React',
-                'vue' => 'Inertia Vue',
-            ],
-            default: 'react',
-            hint: 'Choose the stack matching your application'
-        );
+        $stack = $this->resolveStackChoice('Which stack are you using?');
 
-        $stack = $stackChoice;
+        if ($stack === null) {
+            return self::FAILURE;
+        }
 
         info(sprintf('Setting up stand-alone theme configuration for %s...', $stack === 'react' ? 'Inertia React' : 'Inertia Vue'));
 
@@ -125,6 +125,49 @@ final class ThemeSetupCommand extends Command
         });
     }
 
+    private function resolveStackChoice(string $label): ?string
+    {
+        return $this->resolveChoice(
+            option: 'stack',
+            allowed: ['react', 'vue'],
+            label: $label,
+            options: [
+                'react' => 'Inertia React',
+                'vue' => 'Inertia Vue',
+            ],
+            default: 'react',
+            hint: 'Choose the stack matching your application',
+        );
+    }
+
+    /**
+     * @param  array<int, string>  $allowed
+     * @param  array<string, string>  $options
+     */
+    private function resolveChoice(string $option, array $allowed, string $label, array $options, string $default, string $hint): ?string
+    {
+        $value = $this->option($option);
+
+        if ($value !== null) {
+            $value = (string) $value;
+
+            if (! in_array($value, $allowed, true)) {
+                error(sprintf('Invalid --%s value "%s". Expected one of: %s.', $option, $value, implode(', ', $allowed)));
+
+                return null;
+            }
+
+            return $value;
+        }
+
+        return (string) select(
+            label: $label,
+            options: $options,
+            default: $default,
+            hint: $hint,
+        );
+    }
+
     private function installVueStarterKit(): int
     {
         $stubFiles = [
@@ -149,6 +192,12 @@ final class ThemeSetupCommand extends Command
             }
         }
 
+        if ($this->option('dry-run')) {
+            info('Dry run complete. No files were changed.');
+
+            return self::SUCCESS;
+        }
+
         $this->updateAppCssImports();
         $updateAppCallback();
 
@@ -163,6 +212,26 @@ final class ThemeSetupCommand extends Command
             $this->error('Missing stub file: '.$stubPath);
 
             return false;
+        }
+
+        if (File::exists($destination)) {
+            if ($this->option('skip-existing')) {
+                warning('  - Skipped existing file: '.$destination);
+
+                return true;
+            }
+
+            if (! $this->option('force') && ! $this->option('dry-run') && ! confirm('Overwrite existing file '.$destination.'?', false)) {
+                warning('  - Skipped existing file: '.$destination);
+
+                return true;
+            }
+        }
+
+        if ($this->option('dry-run')) {
+            info((File::exists($destination) ? '  - Would overwrite: ' : '  - Would write: ').$destination);
+
+            return true;
         }
 
         File::ensureDirectoryExists(dirname($destination));

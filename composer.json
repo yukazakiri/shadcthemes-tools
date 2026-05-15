@@ -1,20 +1,37 @@
 {
-  "name": "yukazakiri/shadcthemes-tools",
+  "name": "yukzakiri/shadcthemes-tools",
   "description": "Theme management Artisan commands for tweakcn themes.",
   "type": "library",
+  "keywords": [
+    "laravel",
+    "inertia",
+    "shadcn",
+    "themes",
+    "tailwindcss",
+    "tweakcn"
+  ],
+  "homepage": "https://github.com/yukzakiri/shadcthemes-tools",
   "license": "MIT",
-  "version": "0.1.4",
+  "authors": [
+    {
+      "name": "Yukzakiri"
+    }
+  ],
+  "support": {
+    "issues": "https://github.com/yukzakiri/shadcthemes-tools/issues",
+    "source": "https://github.com/yukzakiri/shadcthemes-tools"
+  },
   "require": {
-    "php": "^8.4",
+    "php": "^8.2",
     "ext-mbstring": "*",
-    "illuminate/console": "^12.0",
-    "illuminate/http": "^12.0",
-    "illuminate/support": "^12.0",
+    "illuminate/console": "^12.0 || ^13.0",
+    "illuminate/http": "^12.0 || ^13.0",
+    "illuminate/support": "^12.0 || ^13.0",
     "laravel/prompts": "^0.3.0"
   },
   "autoload": {
     "psr-4": {
-      "Dccp\\ThemeTools\\": "src/"
+      "Yukzakiri\\ThemeTools\\": "src/"
     }
   },
   "autoload-dev": {
@@ -26,17 +43,18 @@
     "test": "vendor/bin/pest",
     "lint": "vendor/bin/pint",
     "refactor": "vendor/bin/rector process",
-    "analyse": "vendor/bin/phpstan analyse"
+    "analyse": "php -d memory_limit=512M vendor/bin/phpstan analyse"
   },
   "extra": {
     "laravel": {
       "providers": [
-        "Dccp\\ThemeTools\\ThemeToolsServiceProvider"
+        "Yukzakiri\\ThemeTools\\ThemeToolsServiceProvider"
       ]
     }
   },
   "minimum-stability": "stable",
   "require-dev": {
+    "orchestra/testbench": "^10.0 || ^11.0",
     "pestphp/pest": "*",
     "laravel/pint": "*",
     "phpstan/phpstan": "*",

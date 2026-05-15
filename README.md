@@ -14,8 +14,8 @@ Support for **Inertia React** and **Inertia Vue**.
 
 ## Requirements
 
-- PHP 8.4+
-- Laravel 12+
+- PHP 8.2+ for Laravel 12 projects, PHP 8.4+ for Laravel 13 projects
+- Laravel 12 or 13
 - Inertia.js (React or Vue)
 - Tailwind CSS
 
@@ -24,7 +24,7 @@ Support for **Inertia React** and **Inertia Vue**.
 Install the package via Composer:
 
 ```bash
-composer require yukazakiri/shadcthemes-tools
+composer require yukzakiri/shadcthemes-tools
 ```
 
 ## Quick Start
@@ -36,6 +36,25 @@ Run the setup command to initialize the theming system in your application.
 ```bash
 php artisan theme:setup
 ```
+
+For non-interactive installs, pass the setup choices directly:
+
+```bash
+php artisan theme:setup --mode=starter --stack=react --force
+php artisan theme:setup --mode=standalone --stack=vue --skip-existing
+```
+
+`theme:install` is also available as an alias for first-time setup.
+
+Useful setup options:
+
+```bash
+php artisan theme:setup --dry-run
+php artisan theme:setup --skip-existing
+php artisan theme:setup --force
+```
+
+The setup command will now warn before overwriting existing files unless `--force` is used. Use `--skip-existing` to preserve customized files.
 
 You will be presented with two options:
 
@@ -62,6 +81,8 @@ Find a theme you like on [shadcn themes](https://shadcnthemer.com) or [tweakcn](
 php artisan theme:add https://shadcnthemer.com/r/themes/your-theme-id.json
 ```
 
+If the package has not been set up yet, the command will stop with a setup hint instead of failing with a filesystem error.
+
 This command will:
 
 1. Download the theme definition.
@@ -83,6 +104,21 @@ If the package updates its UI stubs (like the Theme Switcher component), you can
 
 ```bash
 php artisan theme:update
+```
+
+For non-interactive updates:
+
+```bash
+php artisan theme:update --stack=react --force
+php artisan theme:update --stack=vue --force
+```
+
+### Diagnosing Setup
+
+Check whether the package has the files and frontend dependencies it expects:
+
+```bash
+php artisan theme:doctor
 ```
 
 ## Contributing
