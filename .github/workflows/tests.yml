@@ -42,7 +42,9 @@ jobs:
         run: composer validate --strict
 
       - name: Install Dependencies
-        run: composer update --with laravel/framework:${{ matrix.laravel }} orchestra/testbench:${{ matrix.testbench }} --no-interaction --prefer-dist
+        run: |
+          composer require laravel/framework:${{ matrix.laravel }} orchestra/testbench:${{ matrix.testbench }} --dev --no-update --no-interaction
+          composer update --no-interaction --prefer-dist
 
       - name: Run Tests
         run: composer test
