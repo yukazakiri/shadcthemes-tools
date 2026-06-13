@@ -72,14 +72,18 @@ final class ImportThemeCommand extends Command
             callback: function () use ($url) {
                 try {
                     /** @var Response $response */
-                    $response = Http::timeout(30)->get($url);
+                    $response = Http::timeout(30)
+                        ->withOptions(['verify' => false])
+                        ->get($url);
 
                     if ($response->failed()) {
                         return null;
                     }
 
                     return $response->json();
-                } catch (Exception) {
+                } catch (Exception $e) {
+                    error('Failed to fetch theme: '.$e->getMessage());
+
                     return null;
                 }
             },
